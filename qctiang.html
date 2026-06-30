@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QC Tiang — Pemeriksaan Mutu Tiang Beton & Galvanis</title>
+<style>
+  :root{
+    --ink:#1c2426;
+    --steel:#3a4a52;
+    --steel-light:#5d7079;
+    --paper:#eef1ee;
+    --paper-dark:#dfe4df;
+    --rule:#c7cdc4;
+    --pass:#2f6b4f;
+    --pass-bg:#e3f1e8;
+    --fail:#a23b2e;
+    --fail-bg:#fbe8e4;
+    --amber:#b3791f;
+    --mono: 'JetBrains Mono','Courier New',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    background-image:
+      linear-gradient(var(--rule) 1px, transparent 1px);
+    background-size: 100% 36px;
+  }
+  header{
+    background:var(--ink);
+    color:var(--paper);
+    padding:28px 32px 22px;
+    position:relative;
+    overflow:hidden;
+    border-bottom:6px solid var(--amber);
+  }
+  header .tape{
+    position:absolute; top:0; right:-40px; bottom:0; width:180px;
+    background:repeating-linear-gradient(135deg, var(--amber) 0 14px, var(--ink) 14px 28px);
+    opacity:.85;
+  }
+  header h1{
+    margin:0; font-size:26px; letter-spacing:.5px; font-weight:800;
+    text-transform:uppercase;
+  }
+  header .sub{
+    font-family:var(--mono); font-size:13px; color:#b7c4c0; margin-top:6px;
+    letter-spacing:.5px;
+  }
+  .wrap{max-width:1280px; margin:0 auto; padding:24px 24px 80px;}
+
+  .typebar{
+    display:flex; gap:10px; flex-wrap:wrap; margin-bottom:22px;
+  }
+  .typebar button{
+    font-family:var(--mono); font-size:12.5px; letter-spacing:.3px;
+    border:1px solid var(--steel); background:var(--paper);
+    padding:9px 16px; cursor:pointer; color:var(--steel); font-weight:600;
+    text-transform:uppercase;
+  }
+  .typebar button.active{
+    background:var(--ink); color:var(--paper); border-color:var(--ink);
+  }
+  .typebar button:disabled{
+    opacity:.4; cursor:not-allowed;
+  }
+  .typebar button:not(:disabled):not(.active):hover{
+    background:var(--paper-dark);
+  }
+
+  .panel{
+    background:#fff; border:1px solid var(--rule);
+  }
+  .panel-head{
+    display:flex; align-items:baseline; justify-content:space-between;
+    padding:16px 22px; border-bottom:1px solid var(--rule);
+    background:var(--paper-dark);
+  }
+  .panel-head h2{margin:0; font-size:15px; text-transform:uppercase; letter-spacing:.6px;}
+  .panel-head .spec-tag{font-family:var(--mono); font-size:12px; color:var(--steel-light);}
+
+  .formgrid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:0;
+  }
+  .field{
+    border-right:1px solid var(--rule); border-bottom:1px solid var(--rule);
+    padding:13px 16px;
+  }
+  .field label{
+    display:block; font-size:11px; color:var(--steel-light); line-height:1.35;
+    margin-bottom:7px; min-height:28px; text-transform:none;
+  }
+  .field .spec{
+    display:block; font-family:var(--mono); font-size:10.5px; color:var(--amber);
+    margin-bottom:6px;
+  }
+  .field input{
+    width:100%; border:none; border-bottom:2px solid var(--steel-light);
+    background:transparent; font-family:var(--mono); font-size:15px;
+    padding:4px 2px; color:var(--ink);
+  }
+  .field input:focus{outline:none; border-bottom-color:var(--ink);}
+  .field input.bad{border-bottom-color:var(--fail); color:var(--fail);}
+  .field input.good{border-bottom-color:var(--pass); color:var(--pass);}
+  .field .unit-tag{font-family:var(--mono); font-size:10.5px; color:var(--steel-light); margin-left:6px;}
+
+  .evidence-row{
+    display:flex; align-items:center; gap:8px; margin-top:9px;
+  }
+  .evidence-btn{
+    display:flex; align-items:center; gap:5px;
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.2px;
+    border:1px dashed var(--steel-light); background:transparent;
+    padding:6px 10px; cursor:pointer; color:var(--steel-light);
+  }
+  .evidence-btn:hover{border-color:var(--steel); color:var(--steel);}
+  .evidence-btn.has-photo{border-style:solid; border-color:var(--pass); color:var(--pass);}
+  .evidence-thumb{
+    width:34px; height:34px; object-fit:cover; border:1px solid var(--rule); cursor:pointer; flex:none;
+  }
+  .evidence-clear{
+    border:none; background:none; color:var(--steel-light); cursor:pointer; font-size:13px;
+  }
+  .evidence-clear:hover{color:var(--fail);}
+
+  .ev-cell{display:flex; align-items:center; gap:6px;}
+  .ev-thumb-sm{width:28px; height:28px; object-fit:cover; border:1px solid var(--rule); cursor:pointer;}
+  .ev-none{color:var(--steel-light); font-size:11px;}
+
+  .lightbox{
+    display:none; position:fixed; inset:0; background:rgba(20,24,22,.88);
+    z-index:999; align-items:center; justify-content:center; padding:24px;
+  }
+  .lightbox.show{display:flex;}
+  .lightbox img{max-width:92vw; max-height:86vh; border:3px solid #fff;}
+  .lightbox .lb-close{
+    position:absolute; top:18px; right:24px; color:#fff; font-size:28px; cursor:pointer;
+    font-family:var(--mono); background:none; border:none;
+  }
+  .lightbox .lb-cap{
+    position:absolute; bottom:24px; left:0; right:0; text-align:center; color:#cfd6d1;
+    font-family:var(--mono); font-size:12px;
+  }
+
+  .actions{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 22px; gap:12px; flex-wrap:wrap;
+  }
+  .actions .note{font-size:12px; color:var(--steel-light); font-family:var(--mono);}
+  .btn{
+    font-family:var(--mono); font-weight:700; font-size:13px; letter-spacing:.4px;
+    padding:11px 22px; border:none; cursor:pointer; text-transform:uppercase;
+  }
+  .btn-add{background:var(--ink); color:#fff;}
+  .btn-add:hover{background:var(--steel);}
+  .btn-ghost{background:transparent; border:1px solid var(--steel); color:var(--steel);}
+  .btn-ghost:hover{background:var(--paper-dark);}
+
+  .resultbar{
+    margin-top:18px; padding:14px 18px; font-family:var(--mono); font-size:13px;
+    display:none; align-items:center; gap:10px; border:1px solid;
+  }
+  .resultbar.show{display:flex;}
+  .resultbar.pass{background:var(--pass-bg); border-color:var(--pass); color:var(--pass);}
+  .resultbar.fail{background:var(--fail-bg); border-color:var(--fail); color:var(--fail);}
+  .resultbar .dot{width:10px; height:10px; border-radius:50%; background:currentColor; flex:none;}
+
+  .tablewrap{margin-top:34px;}
+  .tablewrap h2{font-size:15px; text-transform:uppercase; letter-spacing:.6px; margin:0 0 12px;}
+  table{
+    width:100%; border-collapse:collapse; background:#fff; font-size:12.5px;
+  }
+  thead th{
+    background:var(--steel); color:#fff; font-weight:600; text-align:left;
+    padding:9px 10px; white-space:nowrap; font-size:11px; letter-spacing:.2px;
+    position:sticky; top:0;
+  }
+  tbody td{
+    padding:8px 10px; border-bottom:1px solid var(--rule); font-family:var(--mono);
+    white-space:nowrap;
+  }
+  tbody tr:nth-child(even){background:var(--paper);}
+  .cell-fail{color:var(--fail); font-weight:700;}
+  .cell-pass{color:var(--pass);}
+  .status-pill{
+    display:inline-block; padding:3px 10px; font-weight:700; font-size:11px;
+    letter-spacing:.4px;
+  }
+  .status-pill.PASS{background:var(--pass-bg); color:var(--pass);}
+  .status-pill.FAIL{background:var(--fail-bg); color:var(--fail);}
+  .del-btn{
+    border:none; background:none; color:var(--steel-light); cursor:pointer; font-size:14px;
+  }
+  .del-btn:hover{color:var(--fail);}
+  .empty-state{
+    padding:40px 20px; text-align:center; color:var(--steel-light); font-family:var(--mono);
+    font-size:13px; border:1px dashed var(--rule); background:#fff;
+  }
+  .tablescroll{overflow-x:auto; border:1px solid var(--rule);}
+
+  .toolrow{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;}
+  .summary-chip{font-family:var(--mono); font-size:12px; color:var(--steel-light);}
+  .summary-chip b{color:var(--ink);}
+
+  @media print{
+    .typebar,.actions,.resultbar,header .tape,.btn{display:none !important;}
+    body{background:#fff;}
+  }
+
+  @media (max-width:640px){
+    header{padding:20px 18px 18px;}
+    header h1{font-size:20px;}
+    .wrap{padding:16px 14px 60px;}
+    .formgrid{grid-template-columns:1fr;}
+    .field{border-right:none;}
+    .panel-head{flex-direction:column; align-items:flex-start; gap:4px;}
+    .actions{flex-direction:column; align-items:stretch;}
+    .actions .note{order:2;}
+    .actions > div{display:flex; gap:10px;}
+    .actions > div .btn{flex:1;}
+    .toolrow{flex-direction:column; align-items:stretch;}
+    .toolrow > div{display:flex; gap:8px; flex-wrap:wrap;}
+    .typebar button{flex:1 1 calc(50% - 10px); text-align:center;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="tape"></div>
+  <h1>QC Tiang</h1>
+  <div class="sub">Pemeriksaan Mutu &middot; Tiang Beton / Galvanis &middot; input meter → otomatis ke mm &middot; data &amp; foto tersimpan selama sesi ini</div>
+</header>
+
+<div class="wrap">
+
+  <div class="typebar" id="typebar">
+    <button data-type="7m3" class="active">7 Meter — 3 Segmen</button>
+    <button data-type="7m2" disabled title="Menyusul">7 Meter — 2 Segmen</button>
+    <button data-type="9m" disabled title="Menyusul">9 Meter</button>
+    <button data-type="galv6" disabled title="Menyusul">Galvanis 6 Meter</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="panelTitle">Tiang Beton 7 Meter — 3 Segmen</h2>
+      <span class="spec-tag" id="panelSpecTag">Toleransi sesuai standar input di bawah</span>
+    </div>
+    <div class="formgrid" id="formgrid"></div>
+    <div class="actions">
+      <span class="note">Isi nomor tiang, ukuran (sesuai satuan input), dan lampirkan foto evidence tiap kolom. Status PASS/FAIL otomatis dari nilai yang sudah dikonversi ke satuan standar.</span>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost" id="clearFormBtn">Bersihkan Form</button>
+        <button class="btn btn-add" id="addRowBtn">+ Tambah ke Tabel</button>
+      </div>
+    </div>
+    <div class="resultbar" id="resultbar"><span class="dot"></span><span id="resultText"></span></div>
+  </div>
+
+  <div class="tablewrap">
+    <div class="toolrow">
+      <h2>Hasil Pemeriksaan</h2>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <span class="summary-chip" id="summaryChip">0 tiang diperiksa</span>
+        <button class="btn btn-ghost" id="exportBtn">Export CSV</button>
+        <button class="btn btn-ghost" id="printBtn">Print</button>
+      </div>
+    </div>
+    <div id="tableArea"></div>
+  </div>
+
+</div>
+
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" id="lbClose">✕</button>
+  <img id="lbImg" src="" alt="Evidence">
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<script>
+// ---------- Spec definitions ----------
+// kind: 'range' (nominal +/- tol), 'asym' (nominal, plusPct, minusPct), 'min' (minimum only)
+const SPEC_7M3 = {
+  id: '7m3',
+  label: 'Tiang Beton 7 Meter — 3 Segmen',
+  fields: [
+    { key:'panjang_total', label:'Panjang total', unit:'mm', inputUnit:'m', kind:'range', nominal:7000, tol:40 },
+    { key:'bahan_atas', label:'Panjang bahan tiang ruas Atas', unit:'mm', inputUnit:'m', kind:'range', nominal:1570, tol:20 },
+    { key:'bahan_tengah', label:'Panjang bahan tiang ruas Tengah', unit:'mm', inputUnit:'m', kind:'range', nominal:1570, tol:20 },
+    { key:'bahan_bawah', label:'Panjang bahan tiang ruas Bawah', unit:'mm', inputUnit:'m', kind:'range', nominal:4260, tol:20 },
+    { key:'ruas_atas', label:'Panjang ruas tiang bagian Atas', unit:'mm', inputUnit:'m', kind:'range', nominal:1370, tol:20 },
+    { key:'ruas_tengah', label:'Panjang ruas tiang bagian Tengah', unit:'mm', inputUnit:'m', kind:'range', nominal:1370, tol:20 },
+    { key:'ruas_bawah', label:'Panjang ruas tiang bagian Bawah', unit:'mm', inputUnit:'m', kind:'range', nominal:4260, tol:20 },
+    { key:'lakop_panjang', label:'Panjang Lakop', unit:'cm', inputUnit:'cm', kind:'min', nominal:40 },
+    { key:'lakop_tebal', label:'Tebal Lakop', unit:'mm', inputUnit:'mm', kind:'min', nominal:3 },
+    { key:'diam_atas', label:'Diameter luar ruas Atas', unit:'mm', inputUnit:'mm', kind:'range', nominal:76.3, tol:2 },
+    { key:'diam_tengah', label:'Diameter luar ruas Tengah', unit:'mm', inputUnit:'mm', kind:'range', nominal:114.3, tol:2.9 },
+    { key:'diam_bawah', label:'Diameter luar ruas Bawah', unit:'mm', inputUnit:'mm', kind:'range', nominal:139.8, tol:3.5 },
+    { key:'tebal_atas', label:'Tebal tiang ruas Atas', unit:'mm', inputUnit:'mm', kind:'asym', nominal:4, plusPct:15, minusPct:12.5 },
+    { key:'tebal_tengah', label:'Tebal tiang ruas Tengah', unit:'mm', inputUnit:'mm', kind:'asym', nominal:4, plusPct:15, minusPct:12.5 },
+    { key:'tebal_bawah', label:'Tebal tiang ruas Bawah', unit:'mm', inputUnit:'mm', kind:'asym', nominal:4, plusPct:15, minusPct:12.5 },
+    { key:'berat_aktual', label:'Berat tiang aktual (termasuk tutup)', unit:'kg', inputUnit:'kg', kind:'min', nominal:71.4, note:'Min 71,4 kg · Nominal 91 kg' },
+  ]
+};
+
+function unitFactor(f){
+  // convert from inputUnit to storage unit (f.unit) which is what nominal/tol are expressed in
+  if(f.inputUnit===f.unit) return 1;
+  if(f.inputUnit==='m' && f.unit==='mm') return 1000;
+  if(f.inputUnit==='cm' && f.unit==='mm') return 10;
+  if(f.inputUnit==='mm' && f.unit==='cm') return 0.1;
+  return 1;
+}
+
+function specRange(f){
+  if(f.kind==='range') return { min:f.nominal-f.tol, max:f.nominal+f.tol };
+  if(f.kind==='asym') return { min:f.nominal*(1-f.minusPct/100), max:f.nominal*(1+f.plusPct/100) };
+  if(f.kind==='min') return { min:f.nominal, max:Infinity };
+}
+function specText(f){
+  if(f.kind==='range') return `(${f.nominal} ± ${f.tol}) ${f.unit}`;
+  if(f.kind==='asym') return `${f.nominal} ${f.unit} +${f.plusPct}% / -${f.minusPct}%`;
+  if(f.kind==='min') return f.note ? f.note : `min ${f.nominal} ${f.unit}`;
+}
+function checkValue(f, raw){
+  if(raw===''||raw===null||raw===undefined) return null;
+  const v = parseFloat(String(raw).replace(',','.'));
+  if(isNaN(v)) return null;
+  const converted = v * unitFactor(f);
+  const r = specRange(f);
+  return { value:converted, inputValue:v, ok: converted>=r.min && converted<=r.max, min:r.min, max:r.max };
+}
+
+let activeSpec = SPEC_7M3;
+let rows = []; // {id, nomor, values:{}, overall:'PASS'|'FAIL'}
+let rowCounter = 1;
+let formEvidence = {}; // key -> {url, name}
+
+// ---------- Render form ----------
+function renderForm(){
+  const grid = document.getElementById('formgrid');
+  grid.innerHTML = '';
+  formEvidence = {};
+  // nomor tiang field
+  const idField = document.createElement('div');
+  idField.className = 'field';
+  idField.innerHTML = `<label>Nomor / Identitas Tiang</label><span class="spec" style="visibility:hidden">x</span><input type="text" id="f_nomor" placeholder="cth. TG-001">`;
+  grid.appendChild(idField);
+
+  activeSpec.fields.forEach(f=>{
+    const div = document.createElement('div');
+    div.className = 'field';
+    div.innerHTML = `
+      <label>${f.label} <span style="color:var(--steel-light)">(input: ${f.inputUnit})</span></label>
+      <span class="spec">${specText(f)}</span>
+      <input type="text" inputmode="decimal" id="f_${f.key}" data-key="${f.key}" placeholder="0">
+      <div class="evidence-row" id="evrow_${f.key}">
+        <button type="button" class="evidence-btn" id="evbtn_${f.key}" data-key="${f.key}">📷 Evidence</button>
+        <input type="file" accept="image/*" capture="environment" id="evfile_${f.key}" data-key="${f.key}" style="display:none">
+      </div>
+    `;
+    grid.appendChild(div);
+  });
+
+  document.getElementById('panelTitle').textContent = activeSpec.label;
+  document.getElementById('panelSpecTag').textContent = `${activeSpec.fields.length} parameter pemeriksaan`;
+
+  grid.querySelectorAll('input[data-key][type="text"]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const f = activeSpec.fields.find(x=>x.key===inp.dataset.key);
+      const res = checkValue(f, inp.value);
+      inp.classList.remove('good','bad');
+      if(res){ inp.classList.add(res.ok?'good':'bad'); }
+    });
+  });
+
+  grid.querySelectorAll('.evidence-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.getElementById('evfile_'+btn.dataset.key).click();
+    });
+  });
+
+  grid.querySelectorAll('input[type="file"]').forEach(fileInp=>{
+    fileInp.addEventListener('change', (e)=>{
+      const key = fileInp.dataset.key;
+      const file = e.target.files[0];
+      if(!file) return;
+      const url = URL.createObjectURL(file);
+      formEvidence[key] = { url, name: file.name };
+      renderEvidenceRow(key);
+    });
+  });
+}
+
+function renderEvidenceRow(key){
+  const row = document.getElementById('evrow_'+key);
+  const ev = formEvidence[key];
+  if(!ev){
+    row.innerHTML = `
+      <button type="button" class="evidence-btn" id="evbtn_${key}" data-key="${key}">📷 Evidence</button>
+      <input type="file" accept="image/*" capture="environment" id="evfile_${key}" data-key="${key}" style="display:none">`;
+  } else {
+    row.innerHTML = `
+      <img src="${ev.url}" class="evidence-thumb" data-url="${ev.url}" data-cap="${key}">
+      <button type="button" class="evidence-btn has-photo" data-key="${key}">✓ Foto OK</button>
+      <button type="button" class="evidence-clear" data-key="${key}" title="Hapus foto">✕</button>
+      <input type="file" accept="image/*" capture="environment" id="evfile_${key}" data-key="${key}" style="display:none">`;
+  }
+  // rebind
+  const fileInp = row.querySelector('input[type="file"]');
+  fileInp.addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+    formEvidence[key] = { url, name: file.name };
+    renderEvidenceRow(key);
+  });
+  const photoBtn = row.querySelector('.evidence-btn');
+  photoBtn.addEventListener('click', ()=> fileInp.click());
+  const clearBtn = row.querySelector('.evidence-clear');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{ delete formEvidence[key]; renderEvidenceRow(key); });
+  const thumb = row.querySelector('.evidence-thumb');
+  if(thumb) thumb.addEventListener('click', ()=> openLightbox(ev.url, key));
+}
+
+document.getElementById('clearFormBtn').addEventListener('click', ()=>{
+  renderForm();
+  document.getElementById('resultbar').classList.remove('show');
+});
+
+document.getElementById('addRowBtn').addEventListener('click', ()=>{
+  const nomorInput = document.getElementById('f_nomor');
+  const nomor = nomorInput.value.trim() || `TG-${String(rowCounter).padStart(3,'0')}`;
+  const values = {};
+  let allFilled = true;
+  let allPass = true;
+  activeSpec.fields.forEach(f=>{
+    const inp = document.getElementById('f_'+f.key);
+    const res = checkValue(f, inp.value);
+    if(res===null){ allFilled = false; }
+    else if(!res.ok){ allPass = false; }
+    values[f.key] = { raw: inp.value, result: res, evidence: formEvidence[f.key] ? {...formEvidence[f.key]} : null };
+  });
+
+  const resultbar = document.getElementById('resultbar');
+  const resultText = document.getElementById('resultText');
+  if(!allFilled){
+    resultbar.className = 'resultbar fail show';
+    resultText.textContent = 'Lengkapi seluruh kolom sebelum menambahkan ke tabel.';
+    return;
+  }
+
+  rows.push({ id: rowCounter++, nomor, specId: activeSpec.id, specLabel: activeSpec.label, values, overall: allPass?'PASS':'FAIL' });
+
+  resultbar.className = 'resultbar ' + (allPass?'pass':'fail') + ' show';
+  resultText.textContent = allPass
+    ? `Tiang ${nomor}: LULUS QC — seluruh ${activeSpec.fields.length} parameter sesuai spesifikasi.`
+    : `Tiang ${nomor}: TIDAK LULUS QC — terdapat parameter di luar toleransi.`;
+
+  renderForm();
+  renderTable();
+});
+
+// ---------- Render table ----------
+function renderTable(){
+  const area = document.getElementById('tableArea');
+  const chip = document.getElementById('summaryChip');
+  const total = rows.length;
+  const passCount = rows.filter(r=>r.overall==='PASS').length;
+  chip.innerHTML = `<b>${total}</b> tiang diperiksa &nbsp;·&nbsp; <span style="color:var(--pass)"><b>${passCount}</b> lulus</span> &nbsp;·&nbsp; <span style="color:var(--fail)"><b>${total-passCount}</b> tidak lulus</span>`;
+
+  if(total===0){
+    area.innerHTML = `<div class="empty-state">Belum ada data. Isi form di atas lalu klik "Tambah ke Tabel".</div>`;
+    return;
+  }
+
+  const fields = activeSpec.fields; // table reflects current active spec columns
+  let html = `<div class="tablescroll"><table><thead><tr>
+      <th>No</th><th>Identitas</th><th>Jenis Tiang</th>
+      ${fields.map(f=>`<th>${f.label} (${f.inputUnit})</th>`).join('')}
+      <th>Status</th><th></th>
+    </tr></thead><tbody>`;
+
+  rows.forEach((r,i)=>{
+    html += `<tr>
+      <td>${i+1}</td>
+      <td>${r.nomor}</td>
+      <td>${r.specLabel}</td>
+      ${fields.map(f=>{
+        const v = r.values[f.key];
+        if(!v) return '<td>-</td>';
+        const cls = v.result && !v.result.ok ? 'cell-fail' : 'cell-pass';
+        const evHtml = v.evidence
+          ? `<img src="${v.evidence.url}" class="ev-thumb-sm" data-url="${v.evidence.url}" data-cap="${r.nomor} — ${f.label}">`
+          : `<span class="ev-none">no photo</span>`;
+        return `<td><div class="ev-cell"><span class="${cls}">${v.raw}</span>${evHtml}</div></td>`;
+      }).join('')}
+      <td><span class="status-pill ${r.overall}">${r.overall}</span></td>
+      <td><button class="del-btn" data-id="${r.id}" title="Hapus baris">✕</button></td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  area.innerHTML = html;
+
+  area.querySelectorAll('.del-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      rows = rows.filter(r=>r.id !== parseInt(btn.dataset.id));
+      renderTable();
+    });
+  });
+  area.querySelectorAll('.ev-thumb-sm').forEach(img=>{
+    img.addEventListener('click', ()=> openLightbox(img.dataset.url, img.dataset.cap));
+  });
+}
+
+// ---------- Lightbox ----------
+function openLightbox(url, caption){
+  document.getElementById('lbImg').src = url;
+  document.getElementById('lbCap').textContent = caption || '';
+  document.getElementById('lightbox').classList.add('show');
+}
+function closeLightbox(){
+  document.getElementById('lightbox').classList.remove('show');
+}
+document.getElementById('lbClose').addEventListener('click', closeLightbox);
+document.getElementById('lightbox').addEventListener('click', (e)=>{
+  if(e.target.id==='lightbox') closeLightbox();
+});
+
+// ---------- Export CSV ----------
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  if(rows.length===0){ alert('Belum ada data untuk diexport.'); return; }
+  const fields = activeSpec.fields;
+  const header = ['No','Identitas','Jenis Tiang', ...fields.map(f=>`${f.label} (${f.inputUnit})`), 'Status'];
+  const lines = [header.join(',')];
+  rows.forEach((r,i)=>{
+    const row = [i+1, r.nomor, r.specLabel, ...fields.map(f=> r.values[f.key]?.raw ?? ''), r.overall];
+    lines.push(row.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(','));
+  });
+  const blob = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `QC_Tiang_${activeSpec.id}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('printBtn').addEventListener('click', ()=> window.print());
+
+// ---------- init ----------
+renderForm();
+renderTable();
+</script>
+</body>
+</html>
