@@ -295,10 +295,15 @@ const ALL_SPECS = {'7m3':SPEC_7M3,'7m2':SPEC_7M2,'9m':SPEC_9M};
 // Ganti dua nilai di bawah ini dengan Project URL dan anon public key
 // dari Supabase Project Settings → API.
 // =====================================================================
-const SUPABASE_URL = 'https://scsyigzgdtkqerxfipkw.supabase.co/rest/v1/';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjc3lpZ3pnZHRrcWVyeGZpcGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MzQ4MTMsImV4cCI6MjA5ODUxMDgxM30.6AH5dnWzBU0zECKJHBzRacczgwm8qboGP4gR_RJwo5I';
+const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co'.trim().replace(/\/+$/,'');
+const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY'.trim();
 const SUPABASE_TABLE = 'qc_tiang_rows';
 const SUPABASE_BUCKET = 'evidence';
+
+// Keep only URL-safe characters in a storage path segment
+function safePathSegment(str){
+  return String(str).normalize('NFKD').replace(/[^a-zA-Z0-9_\-]/g,'_');
+}
 
 let sb = null;
 let dbReady = false;
@@ -319,10 +324,12 @@ function setDbStatus(text, ok){
 // Upload 1 file ke Supabase Storage, kembalikan {url, name, path}
 async function uploadEvidence(file, prefixKey){
   if(!dbReady) return {url:URL.createObjectURL(file), name:file.name, path:null};
-  const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
-  const path=`${prefixKey}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
-  const {error}=await sb.storage.from(SUPABASE_BUCKET).upload(path, file, {upsert:true});
-  if(error){ console.error('Upload gagal:',error); throw error; }
+  const rawExt=(file.name.split('.').pop()||'jpg').toLowerCase();
+  const ext=safePathSegment(rawExt) || 'jpg';
+  const safePrefix=safePathSegment(prefixKey);
+  const path=`${safePrefix}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const {error}=await sb.storage.from(SUPABASE_BUCKET).upload(path, file, {upsert:true, contentType:file.type||'image/jpeg'});
+  if(error){ console.error('Upload gagal:',error, 'path:',path); throw error; }
   const {data}=sb.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
   return {url:data.publicUrl, name:file.name, path};
 }
