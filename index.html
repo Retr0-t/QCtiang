@@ -238,9 +238,9 @@ const SPEC_7M3 = {
     {key:'ruas_bawah',    label:'Panjang ruas tiang Bawah',  unit:'mm', inputUnit:'m',  kind:'range', nominal:4260,  tol:20},
     {key:'lakop_panjang', label:'Panjang Lakop',             unit:'cm', inputUnit:'cm', kind:'min',   nominal:40},
     {key:'lakop_tebal',   label:'Tebal Lakop',               unit:'mm', inputUnit:'mm', kind:'min',   nominal:3},
-    {key:'diam_atas',     label:'Diameter luar ruas Atas',   unit:'mm', inputUnit:'mm', kind:'range', nominal:76.3,  tol:2},
-    {key:'diam_tengah',   label:'Diameter luar ruas Tengah', unit:'mm', inputUnit:'mm', kind:'range', nominal:114.3, tol:2.9},
-    {key:'diam_bawah',    label:'Diameter luar ruas Bawah',  unit:'mm', inputUnit:'mm', kind:'range', nominal:139.8, tol:3.5},
+    {key:'diam_atas',     label:'Diameter luar ruas Atas',   unit:'mm', inputUnit:'cm', kind:'range', nominal:76.3,  tol:2,   diamFormula:true},
+    {key:'diam_tengah',   label:'Diameter luar ruas Tengah', unit:'mm', inputUnit:'cm', kind:'range', nominal:114.3, tol:2.9, diamFormula:true},
+    {key:'diam_bawah',    label:'Diameter luar ruas Bawah',  unit:'mm', inputUnit:'cm', kind:'range', nominal:139.8, tol:3.5, diamFormula:true},
     {key:'tebal_atas',    label:'Tebal tiang ruas Atas',     unit:'mm', inputUnit:'mm', kind:'asym',  nominal:4, plusPct:15, minusPct:12.5, multiEvidence:3},
     {key:'tebal_tengah',  label:'Tebal tiang ruas Tengah',   unit:'mm', inputUnit:'mm', kind:'asym',  nominal:4, plusPct:15, minusPct:12.5, multiEvidence:3},
     {key:'tebal_bawah',   label:'Tebal tiang ruas Bawah',    unit:'mm', inputUnit:'mm', kind:'asym',  nominal:4, plusPct:15, minusPct:12.5, multiEvidence:3},
@@ -255,8 +255,8 @@ const SPEC_7M2 = {
     {key:'panjang_total', label:'Panjang total',                  unit:'mm', inputUnit:'m',  kind:'range', nominal:7000, tol:40},
     {key:'ruas_atas',     label:'Panjang ruas tiang segmen Atas', unit:'mm', inputUnit:'m',  kind:'range', nominal:2740, tol:20},
     {key:'ruas_bawah',    label:'Panjang ruas tiang segmen Bawah',unit:'mm', inputUnit:'m',  kind:'range', nominal:4260, tol:20},
-    {key:'diam_atas',     label:'Diameter luar segmen Atas',      unit:'mm', inputUnit:'mm', kind:'range', nominal:76.3, tol:2},
-    {key:'diam_bawah',    label:'Diameter luar segmen Bawah',     unit:'mm', inputUnit:'mm', kind:'range', nominal:114.3,tol:2.9},
+    {key:'diam_atas',     label:'Diameter luar segmen Atas',      unit:'mm', inputUnit:'cm', kind:'range', nominal:76.3, tol:2,   diamFormula:true},
+    {key:'diam_bawah',    label:'Diameter luar segmen Bawah',     unit:'mm', inputUnit:'cm', kind:'range', nominal:114.3,tol:2.9, diamFormula:true},
     {key:'tebal_atas',    label:'Tebal tiang segmen Atas',        unit:'mm', inputUnit:'mm', kind:'asym',  nominal:2.9, plusPct:15, minusPct:12.5, multiEvidence:3},
     {key:'tebal_bawah',   label:'Tebal tiang segmen Bawah',       unit:'mm', inputUnit:'mm', kind:'asym',  nominal:2.9, plusPct:15, minusPct:12.5, multiEvidence:3},
     {key:'berat_aktual',  label:'Berat tiang aktual (termasuk tutup+lakop)', unit:'kg', inputUnit:'kg', kind:'min', nominal:52.5, note:'Min 52,5 kg'},
@@ -275,9 +275,9 @@ const SPEC_9M = {
     {key:'ruas_bawah',    label:'Panjang ruas tiang Bawah',  unit:'mm', inputUnit:'m',  kind:'range', nominal:5000, tol:40},
     {key:'lakop_panjang', label:'Panjang Lakop',             unit:'cm', inputUnit:'cm', kind:'min',   nominal:40},
     {key:'lakop_tebal',   label:'Tebal Lakop',               unit:'mm', inputUnit:'mm', kind:'min',   nominal:3},
-    {key:'diam_atas',     label:'Diameter luar ruas Atas',   unit:'mm', inputUnit:'mm', kind:'range', nominal:76.3,  tol:2},
-    {key:'diam_tengah',   label:'Diameter luar ruas Tengah', unit:'mm', inputUnit:'mm', kind:'range', nominal:114.3, tol:2.9},
-    {key:'diam_bawah',    label:'Diameter luar ruas Bawah',  unit:'mm', inputUnit:'mm', kind:'range', nominal:139.8, tol:3.5},
+    {key:'diam_atas',     label:'Diameter luar ruas Atas',   unit:'mm', inputUnit:'cm', kind:'range', nominal:76.3,  tol:2,   diamFormula:true},
+    {key:'diam_tengah',   label:'Diameter luar ruas Tengah', unit:'mm', inputUnit:'cm', kind:'range', nominal:114.3, tol:2.9, diamFormula:true},
+    {key:'diam_bawah',    label:'Diameter luar ruas Bawah',  unit:'mm', inputUnit:'cm', kind:'range', nominal:139.8, tol:3.5, diamFormula:true},
     {key:'tebal_atas',    label:'Tebal tiang ruas Atas',     unit:'mm', inputUnit:'mm', kind:'asym',  nominal:4, plusPct:15, minusPct:12.5, multiEvidence:3},
     {key:'tebal_tengah',  label:'Tebal tiang ruas Tengah',   unit:'mm', inputUnit:'mm', kind:'asym',  nominal:4, plusPct:15, minusPct:12.5, multiEvidence:3},
     {key:'tebal_bawah',   label:'Tebal tiang ruas Bawah',    unit:'mm', inputUnit:'mm', kind:'asym',  nominal:5, plusPct:15, minusPct:12.5, multiEvidence:3},
@@ -298,6 +298,9 @@ function unitFactor(f){
   if(f.inputUnit==='mm' && f.unit==='cm') return 0.1;
   return 1;
 }
+// Diameter: input cm → ×(7/22) → cm → ×10 → mm
+function applyDiamFormula(cmVal){ return cmVal * 7 / 22 * 10; }
+
 function specRange(f){
   if(f.kind==='range')  return {min:f.nominal-f.tol,                    max:f.nominal+f.tol};
   if(f.kind==='asym')   return {min:f.nominal*(1-f.minusPct/100),        max:f.nominal*(1+f.plusPct/100)};
@@ -305,7 +308,10 @@ function specRange(f){
   return                       {min:-Infinity,                           max:Infinity};
 }
 function specText(f){
-  if(f.kind==='range')  return `(${f.nominal} ± ${f.tol}) ${f.unit}`;
+  if(f.kind==='range')  {
+    const base=`(${f.nominal} ± ${f.tol}) ${f.unit}`;
+    return f.diamFormula ? base+' · input cm × 7÷22 ×10' : base;
+  }
   if(f.kind==='asym')   return `${f.nominal} ${f.unit} +${f.plusPct}% / -${f.minusPct}%`;
   if(f.kind==='min')    return f.note||`min ${f.nominal} ${f.unit}`;
   if(f.kind==='visual') return 'OK / TIDAK OK';
@@ -319,7 +325,8 @@ function checkValue(f, raw){
   if(raw===''||raw===null||raw===undefined) return null;
   const v=parseFloat(String(raw).replace(',','.'));
   if(isNaN(v)) return null;
-  const converted=v*unitFactor(f);
+  // diameter fields: apply (cm × 7/22 × 10) to get mm
+  const converted = f.diamFormula ? applyDiamFormula(v) : v*unitFactor(f);
   const r=specRange(f);
   return {value:converted, inputValue:v, ok:converted>=r.min && converted<=r.max};
 }
@@ -395,10 +402,14 @@ function renderForm(){
         </select>
         <div id="evrow_${f.key}"></div>`;
     } else {
+      const unitHint = f.diamFormula
+        ? `input cm · (×7÷22×10 → mm)`
+        : `input: ${f.inputUnit}${f.multiEvidence?' · 3 foto':''}`;
       div.innerHTML=`
-        <label>${f.label} <span style="color:var(--steel-light)">(input: ${f.inputUnit}${f.multiEvidence?' · 3 foto':''})</span></label>
+        <label>${f.label} <span style="color:var(--steel-light)">(${unitHint})</span></label>
         <span class="spec">${specText(f)}</span>
-        <input type="text" inputmode="decimal" id="f_${f.key}" data-key="${f.key}" placeholder="0">
+        <input type="text" inputmode="decimal" id="f_${f.key}" data-key="${f.key}" placeholder="0 cm">
+        ${f.diamFormula?`<span class="diam-converted" id="conv_${f.key}" style="font-family:var(--mono);font-size:11px;color:var(--steel-light);margin-top:3px;display:block;">— mm</span>`:''}
         <div id="evrow_${f.key}"></div>`;
     }
     grid.appendChild(div);
@@ -412,6 +423,22 @@ function renderForm(){
       const res=checkValue(f,inp.value);
       inp.classList.remove('good','bad');
       if(res) inp.classList.add(res.ok?'good':'bad');
+      // live mm preview for diameter fields
+      if(f.diamFormula){
+        const convEl=document.getElementById('conv_'+f.key);
+        if(convEl){
+          if(res){
+            const mm=Number(res.value.toFixed(3));
+            const r=specRange(f);
+            const ok=res.ok;
+            convEl.textContent=`= ${mm} mm`;
+            convEl.style.color=ok?'var(--pass)':'var(--fail)';
+          } else {
+            convEl.textContent='— mm';
+            convEl.style.color='var(--steel-light)';
+          }
+        }
+      }
     });
   });
 
