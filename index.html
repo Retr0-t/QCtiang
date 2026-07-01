@@ -6,6 +6,7 @@
 <title>QC Tiang — Pemeriksaan Mutu Tiang TELKOM | by Mighty</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --ink:#1c2426; --steel:#3a4a52; --steel-light:#5d7079;
@@ -167,6 +168,7 @@
 </header>
 
 <div class="wrap">
+  <div class="summary-chip" id="dbStatus" style="margin-bottom:10px;display:block;">🔄 Menghubungkan ke database...</div>
   <div class="typebar" id="typebar">
     <button data-type="7m3" class="active">7 Meter — 3 Segmen</button>
     <button data-type="7m2">7 Meter — 2 Segmen</button>
@@ -176,7 +178,7 @@
 
   <div class="panel">
     <div class="panel-head">
-      <h2 id="panelTitle">Tiang Beton 7 Meter — 3 Segmen</h2>
+      <h2 id="panelTitle">Tiang 7 Meter — 3 Segmen</h2>
       <span class="spec-tag" id="panelSpecTag"></span>
     </div>
     <div class="formgrid" id="formgrid"></div>
@@ -230,7 +232,7 @@ const VISUAL_FIELDS = [
 ];
 
 const SPEC_7M3 = {
-  id:'7m3', label:'Tiang Beton 7 Meter — 3 Segmen',
+  id:'7m3', label:'Tiang 7 Meter — 3 Segmen',
   fields:[
     {key:'panjang_total', label:'Panjang total',             unit:'mm', inputUnit:'m',  kind:'range', nominal:7000,  tol:40},
     {key:'ruas_atas',     label:'Panjang ruas tiang Atas',   unit:'mm', inputUnit:'m',  kind:'range', nominal:1370,  tol:20},
@@ -250,7 +252,7 @@ const SPEC_7M3 = {
 };
 
 const SPEC_7M2 = {
-  id:'7m2', label:'Tiang Beton 7 Meter — 2 Segmen',
+  id:'7m2', label:'Tiang 7 Meter — 2 Segmen',
   fields:[
     {key:'panjang_total', label:'Panjang total',                  unit:'mm', inputUnit:'m',  kind:'range', nominal:7000, tol:40},
     {key:'ruas_atas',     label:'Panjang ruas tiang segmen Atas', unit:'mm', inputUnit:'m',  kind:'range', nominal:2740, tol:20},
@@ -267,7 +269,7 @@ const SPEC_7M2 = {
 };
 
 const SPEC_9M = {
-  id:'9m', label:'Tiang Beton 9 Meter — 3 Segmen',
+  id:'9m', label:'Tiang 9 Meter — 3 Segmen',
   fields:[
     {key:'panjang_total', label:'Panjang total',             unit:'mm', inputUnit:'m',  kind:'range', nominal:9000, tol:40},
     {key:'ruas_atas',     label:'Panjang ruas tiang Atas',   unit:'mm', inputUnit:'m',  kind:'range', nominal:2000, tol:40},
@@ -287,6 +289,77 @@ const SPEC_9M = {
 };
 
 const ALL_SPECS = {'7m3':SPEC_7M3,'7m2':SPEC_7M2,'9m':SPEC_9M};
+
+// =====================================================================
+// SUPABASE CONFIG
+// Ganti dua nilai di bawah ini dengan Project URL dan anon public key
+// dari Supabase Project Settings → API.
+// =====================================================================
+const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
+const SUPABASE_TABLE = 'qc_tiang_rows';
+const SUPABASE_BUCKET = 'evidence';
+
+let sb = null;
+let dbReady = false;
+if(!SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_ANON_KEY.includes('YOUR-ANON')){
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  dbReady = true;
+} else {
+  console.warn('Supabase belum dikonfigurasi. Isi SUPABASE_URL & SUPABASE_ANON_KEY.');
+}
+
+function setDbStatus(text, ok){
+  const el=document.getElementById('dbStatus');
+  if(!el) return;
+  el.textContent=text;
+  el.style.color = ok===true ? 'var(--pass)' : ok===false ? 'var(--fail)' : 'var(--steel-light)';
+}
+
+// Upload 1 file ke Supabase Storage, kembalikan {url, name, path}
+async function uploadEvidence(file, prefixKey){
+  if(!dbReady) return {url:URL.createObjectURL(file), name:file.name, path:null};
+  const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+  const path=`${prefixKey}/${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const {error}=await sb.storage.from(SUPABASE_BUCKET).upload(path, file, {upsert:true});
+  if(error){ console.error('Upload gagal:',error); throw error; }
+  const {data}=sb.storage.from(SUPABASE_BUCKET).getPublicUrl(path);
+  return {url:data.publicUrl, name:file.name, path};
+}
+
+// Simpan 1 baris hasil pemeriksaan ke database, kembalikan row dari DB (dengan id)
+async function saveRowToDb(row){
+  if(!dbReady) return {...row, id:row.id};
+  const payload={
+    nomor:row.nomor, spec_id:row.specId, spec_label:row.specLabel,
+    values:row.values, overall:row.overall
+  };
+  const {data,error}=await sb.from(SUPABASE_TABLE).insert(payload).select().single();
+  if(error){ console.error('Gagal simpan ke database:',error); throw error; }
+  return {id:data.id, nomor:data.nomor, specId:data.spec_id, specLabel:data.spec_label,
+          fields:[...ALL_SPECS[data.spec_id].fields], values:data.values, overall:data.overall};
+}
+
+async function deleteRowFromDb(id){
+  if(!dbReady) return;
+  const {error}=await sb.from(SUPABASE_TABLE).delete().eq('id', id);
+  if(error){ console.error('Gagal hapus dari database:',error); alert('Gagal menghapus data di database: '+error.message); }
+}
+
+// Ambil semua baris tersimpan dari database saat halaman dibuka
+async function loadRowsFromDb(){
+  if(!dbReady){ setDbStatus('⚠️ Database belum dikonfigurasi — data hanya tersimpan sementara di browser ini.', false); return; }
+  setDbStatus('🔄 Memuat data tersimpan...', null);
+  const {data,error}=await sb.from(SUPABASE_TABLE).select('*').order('id',{ascending:true});
+  if(error){ console.error(error); setDbStatus('⚠️ Gagal memuat data dari database: '+error.message, false); return; }
+  rows = data.map(d=>({
+    id:d.id, nomor:d.nomor, specId:d.spec_id, specLabel:d.spec_label,
+    fields:[...(ALL_SPECS[d.spec_id]?.fields||[])], values:d.values, overall:d.overall
+  }));
+  rowCounter = rows.length ? Math.max(...rows.map(r=>r.id))+1 : 1;
+  setDbStatus(`✅ Terhubung ke database — ${rows.length} data tiang tersimpan.`, true);
+  renderTable();
+}
 
 // =====================================================================
 // HELPERS
@@ -476,9 +549,15 @@ function renderSingleEvidence(key){
     </div>`;
   }
   const fi=row.querySelector('input[type="file"]');
-  fi.addEventListener('change',e=>{
+  fi.addEventListener('change',async e=>{
     const file=e.target.files[0]; if(!file) return;
-    formEvidence[key]={url:URL.createObjectURL(file),name:file.name};
+    const btn=row.querySelector('.evidence-btn');
+    if(btn){ btn.textContent='⏳ Mengunggah...'; btn.disabled=true; }
+    try{
+      formEvidence[key]=await uploadEvidence(file, 'single_'+key);
+    }catch(err){
+      alert('Gagal mengunggah foto: '+err.message);
+    }
     renderSingleEvidence(key);
   });
   row.querySelector('.evidence-btn').addEventListener('click',()=>fi.click());
@@ -514,9 +593,15 @@ function renderMultiEvidence(key, fieldLabel){
 
   for(let i=0;i<3;i++){
     const fi=document.getElementById(`evfile_${key}_${i}`);
-    fi.addEventListener('change',e=>{
+    fi.addEventListener('change',async e=>{
       const file=e.target.files[0]; if(!file) return;
-      formEvidence[key][i]={url:URL.createObjectURL(file),name:file.name};
+      const slotBtnEl=row.querySelector(`.ev-slot-btn[data-idx="${i}"]`)||row.querySelector(`.ev-slot-change[data-idx="${i}"]`);
+      if(slotBtnEl) slotBtnEl.textContent='⏳';
+      try{
+        formEvidence[key][i]=await uploadEvidence(file, `multi_${key}_${i}`);
+      }catch(err){
+        alert('Gagal mengunggah foto: '+err.message);
+      }
       renderMultiEvidence(key,fieldLabel);
     });
     const slotBtn=row.querySelector(`.ev-slot-btn[data-idx="${i}"]`);
@@ -539,7 +624,7 @@ document.getElementById('clearFormBtn').addEventListener('click',()=>{
   document.getElementById('resultbar').classList.remove('show');
 });
 
-document.getElementById('addRowBtn').addEventListener('click',()=>{
+document.getElementById('addRowBtn').addEventListener('click',async ()=>{
   const nomor=(document.getElementById('f_nomor').value.trim())||`TG-${String(rowCounter).padStart(3,'0')}`;
   const values={};
   let allFilled=true, allPass=true;
@@ -571,13 +656,26 @@ document.getElementById('addRowBtn').addEventListener('click',()=>{
     rt.textContent='Lengkapi seluruh kolom (termasuk inspeksi visual) sebelum menambahkan ke tabel.';
     return;
   }
-  rows.push({id:rowCounter++, nomor, specId:activeSpec.id, specLabel:activeSpec.label, fields:[...activeSpec.fields], values, overall:allPass?'PASS':'FAIL'});
-  rb.className='resultbar '+(allPass?'pass':'fail')+' show';
-  rt.textContent=allPass
-    ?`Tiang ${nomor}: LULUS QC — seluruh parameter sesuai spesifikasi.`
-    :`Tiang ${nomor}: TIDAK LULUS QC — terdapat parameter di luar toleransi atau tidak OK.`;
-  renderForm();
-  renderTable();
+  const newRow={id:rowCounter, nomor, specId:activeSpec.id, specLabel:activeSpec.label, fields:[...activeSpec.fields], values, overall:allPass?'PASS':'FAIL'};
+
+  const addBtn=document.getElementById('addRowBtn');
+  addBtn.disabled=true; addBtn.textContent='Menyimpan...';
+  try{
+    const saved=await saveRowToDb(newRow);
+    rowCounter++;
+    rows.push(saved);
+    rb.className='resultbar '+(allPass?'pass':'fail')+' show';
+    rt.textContent=allPass
+      ?`Tiang ${nomor}: LULUS QC — seluruh parameter sesuai spesifikasi. Data tersimpan ke database.`
+      :`Tiang ${nomor}: TIDAK LULUS QC — terdapat parameter di luar toleransi atau tidak OK. Data tersimpan ke database.`;
+    renderForm();
+    renderTable();
+  }catch(err){
+    rb.className='resultbar fail show';
+    rt.textContent='Gagal menyimpan ke database: '+err.message;
+  }finally{
+    addBtn.disabled=false; addBtn.textContent='+ Tambah ke Tabel';
+  }
 });
 
 // =====================================================================
@@ -636,7 +734,13 @@ function renderTable(){
   area.innerHTML=html;
 
   area.querySelectorAll('.del-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{ rows=rows.filter(r=>r.id!==parseInt(btn.dataset.id)); renderTable(); });
+    btn.addEventListener('click',async ()=>{
+      const id=parseInt(btn.dataset.id);
+      btn.disabled=true;
+      await deleteRowFromDb(id);
+      rows=rows.filter(r=>r.id!==id);
+      renderTable();
+    });
   });
   area.querySelectorAll('.ev-thumb-sm').forEach(img=>{
     img.addEventListener('click',()=>openLightbox(img.dataset.url,img.dataset.cap));
@@ -819,7 +923,7 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
       doc.setFont('helvetica','bold'); doc.setFontSize(13);
       doc.text('LAPORAN QC TIANG',M,13);
       doc.setFont('helvetica','normal'); doc.setFontSize(9);
-      doc.text('Telkom Indonesia — Pemeriksaan Mutu Tiang Beton',M,18.5);
+      doc.text('Telkom Indonesia — Pemeriksaan Mutu Tiang',M,18.5);
       doc.setTextColor(180,200,195);
       doc.text(`Dicetak: ${dateStr}  |  Hal. ${ri+1}/${rows.length}`,PW-M,13,{align:'right'});
       doc.text('Dibuat oleh: Mighty',PW-M,18.5,{align:'right'});
@@ -1010,6 +1114,7 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
 // =====================================================================
 renderForm();
 renderTable();
+loadRowsFromDb();
 </script>
 </body>
 </html>
