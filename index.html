@@ -173,7 +173,7 @@
     <button data-type="7m3" class="active">7 Meter — 3 Segmen</button>
     <button data-type="7m2">7 Meter — 2 Segmen</button>
     <button data-type="9m">9 Meter</button>
-    <button data-type="galv6" disabled title="Menyusul">Galvanis 6 Meter</button>
+    <button data-type="galv6">Galvanis 6 Meter</button>
   </div>
 
   <div class="panel">
@@ -288,7 +288,24 @@ const SPEC_9M = {
   ]
 };
 
-const ALL_SPECS = {'7m3':SPEC_7M3,'7m2':SPEC_7M2,'9m':SPEC_9M};
+const VISUAL_FIELDS_GALV = [
+  {key:'visual_tanam', label:'Terdapat tanda tanam',                                                              kind:'visual'},
+  {key:'visual_cat',   label:'Warna cat sesuai standar pengecatan (silver / cat identitas operator)',              kind:'visual'},
+  {key:'visual_merk',  label:'Terdapat nama / simbol merk pabrik dicetak timbul atau tekan pada tutup bagian atas',kind:'visual'},
+];
+
+const SPEC_GALV6 = {
+  id:'galv6', label:'Tiang Galvanis 6 Meter',
+  fields:[
+    {key:'panjang_total', label:'Panjang tiang (diukur dari batas tanpa tutup / T)', unit:'mm', inputUnit:'m',  kind:'asymAbs', nominal:6000, plusAbs:50, minusAbs:0},
+    {key:'diam_luar',     label:'Diameter Luar (OD)',                                unit:'mm', inputUnit:'mm', kind:'rangePct', nominal:76.3, tolPct:1},
+    {key:'tebal_tiang',   label:'Tebal tiang',                                       unit:'mm', inputUnit:'mm', kind:'asym', nominal:4, plusPct:15, minusPct:12.5, multiEvidence:3},
+    {key:'berat_aktual',  label:'Berat tiang aktual',                                unit:'kg', inputUnit:'kg', kind:'min', nominal:43.78, note:'Minimal 43,78 kg'},
+    ...VISUAL_FIELDS_GALV,
+  ]
+};
+
+const ALL_SPECS = {'7m3':SPEC_7M3,'7m2':SPEC_7M2,'9m':SPEC_9M,'galv6':SPEC_GALV6};
 
 // =====================================================================
 // SUPABASE CONFIG
@@ -296,7 +313,7 @@ const ALL_SPECS = {'7m3':SPEC_7M3,'7m2':SPEC_7M2,'9m':SPEC_9M};
 // dari Supabase Project Settings → API.
 // =====================================================================
 const SUPABASE_URL = 'https://scsyigzgdtkqerxfipkw.supabase.co'.trim().replace(/\/+$/,'');
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjc3lpZ3pnZHRrcWVyeGZpcGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MzQ4MTMsImV4cCI6MjA5ODUxMDgxM30.6AH5dnWzBU0zECKJHBzRacczgwm8qboGP4gR_RJwo5I'.trim();
+const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY'.trim();
 const SUPABASE_TABLE = 'qc_tiang_rows';
 const SUPABASE_BUCKET = 'evidence';
 
@@ -382,17 +399,21 @@ function unitFactor(f){
 function applyDiamFormula(cmVal){ return cmVal * 7 / 22 * 10; }
 
 function specRange(f){
-  if(f.kind==='range')  return {min:f.nominal-f.tol,                    max:f.nominal+f.tol};
-  if(f.kind==='asym')   return {min:f.nominal*(1-f.minusPct/100),        max:f.nominal*(1+f.plusPct/100)};
-  if(f.kind==='min')    return {min:f.nominal,                           max:Infinity};
-  return                       {min:-Infinity,                           max:Infinity};
+  if(f.kind==='range')    return {min:f.nominal-f.tol,                      max:f.nominal+f.tol};
+  if(f.kind==='rangePct') return {min:f.nominal*(1-f.tolPct/100),           max:f.nominal*(1+f.tolPct/100)};
+  if(f.kind==='asym')     return {min:f.nominal*(1-f.minusPct/100),         max:f.nominal*(1+f.plusPct/100)};
+  if(f.kind==='asymAbs')  return {min:f.nominal-f.minusAbs,                 max:f.nominal+f.plusAbs};
+  if(f.kind==='min')      return {min:f.nominal,                            max:Infinity};
+  return                         {min:-Infinity,                           max:Infinity};
 }
 function specText(f){
   if(f.kind==='range')  {
     const base=`(${f.nominal} ± ${f.tol}) ${f.unit}`;
     return f.diamFormula ? base+' · input cm × 7÷22 ×10' : base;
   }
+  if(f.kind==='rangePct') return `${f.nominal} ${f.unit} ± ${f.tolPct}%`;
   if(f.kind==='asym')   return `${f.nominal} ${f.unit} +${f.plusPct}% / -${f.minusPct}%`;
+  if(f.kind==='asymAbs') return `${f.nominal} ${f.unit} (+${f.plusAbs} / -${f.minusAbs} ${f.unit})`;
   if(f.kind==='min')    return f.note||`min ${f.nominal} ${f.unit}`;
   if(f.kind==='visual') return 'OK / TIDAK OK';
   return f.note||'Dicatat';
@@ -634,18 +655,12 @@ document.getElementById('clearFormBtn').addEventListener('click',()=>{
 document.getElementById('addRowBtn').addEventListener('click',async ()=>{
   const nomor=(document.getElementById('f_nomor').value.trim())||`TG-${String(rowCounter).padStart(3,'0')}`;
   const values={};
-  let allFilled=true, allPass=true;
+  let filledCount=0, allPass=true;
 
   activeSpec.fields.forEach(f=>{
-    let rawVal;
-    if(isVisual(f)){
-      rawVal=document.getElementById('f_'+f.key).value;
-    } else {
-      rawVal=document.getElementById('f_'+f.key).value;
-    }
+    const rawVal=document.getElementById('f_'+f.key).value;
     const res=checkValue(f,rawVal);
-    if(res===null) allFilled=false;
-    else if(!res.ok) allPass=false;
+    if(res!==null){ filledCount++; if(!res.ok) allPass=false; }
 
     let evidenceCopy;
     if(f.multiEvidence){
@@ -658,12 +673,14 @@ document.getElementById('addRowBtn').addEventListener('click',async ()=>{
 
   const rb=document.getElementById('resultbar');
   const rt=document.getElementById('resultText');
-  if(!allFilled){
+  if(filledCount===0){
     rb.className='resultbar fail show';
-    rt.textContent='Lengkapi seluruh kolom (termasuk inspeksi visual) sebelum menambahkan ke tabel.';
+    rt.textContent='Isi minimal satu kolom sebelum menambahkan ke tabel.';
     return;
   }
-  const newRow={id:rowCounter, nomor, specId:activeSpec.id, specLabel:activeSpec.label, fields:[...activeSpec.fields], values, overall:allPass?'PASS':'FAIL'};
+  const isComplete = filledCount===activeSpec.fields.length;
+  const overallStatus = allPass ? 'PASS' : 'FAIL';
+  const newRow={id:rowCounter, nomor, specId:activeSpec.id, specLabel:activeSpec.label, fields:[...activeSpec.fields], values, overall:overallStatus};
 
   const addBtn=document.getElementById('addRowBtn');
   addBtn.disabled=true; addBtn.textContent='Menyimpan...';
@@ -672,9 +689,10 @@ document.getElementById('addRowBtn').addEventListener('click',async ()=>{
     rowCounter++;
     rows.push(saved);
     rb.className='resultbar '+(allPass?'pass':'fail')+' show';
+    const incompleteNote = isComplete ? '' : ` (${filledCount}/${activeSpec.fields.length} kolom terisi — data disimpan sebagian, bisa dilengkapi/diedit nanti)`;
     rt.textContent=allPass
-      ?`Tiang ${nomor}: LULUS QC — seluruh parameter sesuai spesifikasi. Data tersimpan ke database.`
-      :`Tiang ${nomor}: TIDAK LULUS QC — terdapat parameter di luar toleransi atau tidak OK. Data tersimpan ke database.`;
+      ?`Tiang ${nomor}: LULUS QC — seluruh parameter yang diisi sesuai spesifikasi.${incompleteNote} Data tersimpan ke database.`
+      :`Tiang ${nomor}: TIDAK LULUS QC — terdapat parameter di luar toleransi atau tidak OK.${incompleteNote} Data tersimpan ke database.`;
     renderForm();
     renderTable();
   }catch(err){
